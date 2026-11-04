@@ -116,12 +116,15 @@ describe('normalizePath', () => {
           `
             import assert from 'node:assert/strict'
             import { readFileSync, writeFileSync } from 'node:fs'
+            import os from 'node:os'
             import path from 'node:path'
             import { create } from 'node:vfs'
             import { normalizePath } from ${JSON.stringify(vite)}
 
             const filesystem = create()
-            const root = filesystem.mount()
+            // Early Node 26 releases require an explicit mount point.
+            filesystem.mount(path.join(os.devNull, 'vfs', 'vite-normalize-path'))
+            const root = filesystem.mountPoint
             try {
               const filename = path.join(root, 'entry.js')
               writeFileSync(filename, 'export default 1')
