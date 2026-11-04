@@ -1,0 +1,44 @@
+name: Windows namespace regression
+
+on:
+  push:
+    branches:
+      - verify/windows-namespace-paths
+
+permissions:
+  contents: read
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  windows-vfs:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 3
+          persist-credentials: false
+      - uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
+        with:
+          runtime: node@26
+          cache: true
+      - name: Build upstream normalization
+        shell: pwsh
+        run: |
+          git show 95c2daf1352b3509ec93e6e08a0eaabe23a61b28:packages/vite/src/node/utils.ts | Set-Content -Encoding utf8 packages/vite/src/node/utils.ts
+          pnpm --filter vite build
+      - name: Reproduce the Windows VFS failure
+        id: baseline
+        continue-on-error: true
+        run: pnpm test-unit packages/vite/src/node/__tests__/utils.spec.ts -t node:vfs
+      - name: Require the baseline regression
+        if: steps.baseline.outcome != 'failure'
+        run: throw 'The upstream VFS regression did not fail'
+      - name: Build the namespace fix
+        run: |
+          git restore packages/vite/src/node/utils.ts
+          pnpm build
+      - name: Run the unit suite with the namespace fix
+        run: pnpm test-unit
